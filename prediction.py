@@ -1,209 +1,128 @@
-import math
-import torch
-import pandas as pd
-from sklearn import linear_model
-from sklearn.cluster import KMeans
-import scipy.stats as stats
-import pylab
-from kneed import KneeLocator
 import pickle
-from matplotlib.patches import Rectangle
+
+import torch
+import argparse
+import pandas as pd
 import numpy as np
-from sklearn.model_selection import ShuffleSplit
-from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt
+import networkx as nx
+
+from cluster_utils import plot_optimal_clusters, k_means, try_data
+from loss import loss_function_ae
+from model import GCNModelAE
+from plots import plot_loss, auc_roc
+from utils import load_data, preprocess_graph, get_acc, mask_test_edges, get_roc_score, mask_test_edges2
+
+# Saved models: gcn_model
 
 
-def k_meansElbow(data, type):
-    Sum_of_squared_distances = []
-    _min = 3
-    _max = 40
-    stp = 5
-    K = range(_min, _max)
-    for k in K:
-        km = KMeans(n_clusters=k)
-        km = km.fit(data)
-        Sum_of_squared_distances.append(km.inertia_)
-    kn = KneeLocator(K, Sum_of_squared_distances, curve='convex', direction='decreasing')
-    plt.plot(K, Sum_of_squared_distances, 'bx-')
-    plt.vlines(kn.knee, plt.ylim()[0], plt.ylim()[1], linestyles='dashed')
-    plt.xlabel('k')
-    plt.ylabel('Sum_of_squared_distances')
-    plt.title('Elbow Method For Optimal k --- ' + type)
-    plt.text(_max - 2 * stp, max(Sum_of_squared_distances), 'k = %d' % kn.knee)
-    plt.show()
+parser = argparse.ArgumentParser()
+parser.add_argument('--no-cuda', action='store_true', default=False,
+                    help='Disables CUDA training.')
+parser.add_argument('--fastmode', action='store_true', default=False,
+                    help='Validate during training pass.')
+parser.add_argument('--seed', type=int, default=42, help='Random seed.')
+parser.add_argument('--epochs', type=int, default=50,
+                    help='Number of epochs to train.')
+parser.add_argument('--lr', type=float, default=0.01,
+                    help='Initial learning rate.')
+parser.add_argument('--weight_decay', type=float, default=5e-4,
+                    help='Weight decay (L2 loss on parameters).')
+parser.add_argument('--hidden', type=int, default=32,
+                    help='Number of hidden units.')
+parser.add_argument('--ndim', type=int, default=16,
+                    help='Number of dimension.')
+parser.add_argument('--dropout', type=float, default=0.,
+                    help='Dropout rate (1 - keep probability).')
+parser.add_argument('--saved-model', type=str, default='tr/trained', help='Saved model')
+parser.add_argument('--title', type=str, default=' -- G --', help='graph form')
+
+args = parser.parse_args()
+args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 
-def plot_optimal_clusters(data, type):
-    k_meansElbow(data, type)
-    exit()
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+if args.cuda:
+    torch.cuda.manual_seed(args.seed)
+
+with open('test1.pkl', 'rb') as f:
+    x = pickle.load(f)
+    print(x.shape)
+adj, features = load_data(x, False)
+
+G = nx.from_numpy_matrix(adj.toarray())
+adj_train = preprocess_graph(adj)
 
 
-# Cluster with K-means
-# K-Means
-def k_means(data, n_clusters):
-    kmeans = KMeans(n_clusters=n_clusters)
-    kmeans_model = kmeans.fit(data)
-    # pickle.dump(kmeans_model, open("kmeans_model.pkl", 'wb'))
-    kmeans_labels = kmeans.labels_
-    return kmeans_labels
+model = GCNModelAE(nfeat=features.shape[1],
+                       nhid=args.hidden,
+                       nclass=args.ndim,
+                       dropout=args.dropout)
+model.load_state_dict(torch.load(args.saved_model))
+model.eval()
 
 
-def try_data(_prediction):
-    final = torch.sigmoid(_prediction)
-    return final
+output = model(features, adj_train)
+output = try_data(output)
+output = output.detach().numpy()
+
+# Normalize the output data
+data = output
+# scaler = StandardScaler().fit(output)
+# data = scaler.transform(output)
+
+# Convert to pandas
+meta_df = {}
+_vars = []
+for i in range(args.ndim):
+    meta_df[str(i)] = output[:, i]
+    _vars.append(str(i))
+data_df = pd.DataFrame(meta_df)
 
 
-def cal_outlier(x, q_1, q_3):
-    if x < q_1:
-        return False
-    elif x > q_3:
-        return False
-    else:
-        return True
+plot_optimal_clusters(data, "K-means " + args.title, 'kmeans')
+kmeans_labels = k_means(data, 9, model_name="models/kmeans_gcn_model.pkl")
+
+# Add labels
+data_df['KMeans-clusters'] = kmeans_labels
+kmeans_unique_clusters = set(kmeans_labels)
+
+# # compute davies and silhoutte scores
+# scores = {}
+# scores['dav_score'] = davies_bouldin_score(data, kmeans_labels)
+# scores['sil_score'] = silhouette_score(data, kmeans_labels)
+# write_file('results/cluster_scores_gcn.csv', scores)
 
 
-# remove outliers
-def rem_out(xx, yy):
-    y_q1 = np.quantile(yy, .25)
-    y_q3 = np.quantile(yy, .75)
-    y_iqr = y_q3 - y_q1
-    y_q1 = y_q1 - 1.5*y_iqr
-    y_q3 = y_q3 + 1.5*y_iqr
-    xxx = []
-    yyy =[]
-    for i, j in zip(xx, yy):
-        y = cal_outlier(j, y_q1, y_q3)
-        if y:
-            xxx.append(i)
-            yyy.append(j)
-    return np.array(xxx), np.array(yyy), ' -- No Outlier'
+# res = read_file("data/ms-project/geneset_pairing.csv")
+# dict = dict((v, k) for k, v in res.items())
+# data_df['gensets'] = data_df.index.map(dict)
+# # data_df.set_index('gensets', inplace=True)
+#
+# sim = data_df[['gensets', 'KMeans-clusters']]
+# grp = data_df[['gensets', 'KMeans-clusters']]\
+#     .sort_values('KMeans-clusters')\
+#     .set_index(['KMeans-clusters', 'gensets'], inplace=False)
+# agg = data_df.groupby('KMeans-clusters').agg({'gensets': 'count'})
+#
+#
+# writer = pd.ExcelWriter('results/kmeans_gcn_hom_onto.xlsx')
+# sim.to_excel(writer, sheet_name='simple')
+# grp.to_excel(writer, sheet_name='grouped')
+# agg.to_excel(writer, sheet_name='agg')
+# writer.save()
+# #
+# #
+# # # Plots here
+# # plots_pairwise(data_df, 'KMeans-clusters', _vars, kmeans_unique_clusters,
+# #                 "Pairwise Scatter Plot for KMeans Clustering" + args.title)
+# # plot_heat_map(data_df.iloc[:, 0:16], "Correlation matrix for Node Embeddings " + args.title)
+# #
+# plot_tsne(data_df.iloc[:, 0:16], data_df['KMeans-clusters'],
+#           "Clustering node embeddings with KMeans Perplexity: {} -- "
+#           "Number of Iterations: {}" + args.title, perplexity=50, n_iter=1000)
 
+# # write to tsv for visualisation
+# tsv_df = data_df.iloc[:, 0:17]
+# tsv_df.to_csv("tsv/kmeans_gcn", sep="\t", index=False)
 
-def pickle_save(filename, data):
-    with open(filename, "wb") as f:
-        pickle.dump(data, f)
-
-
-def pickle_load(filename):
-    with open(filename, "rb") as f:
-        x = pickle.load(f)
-        return x
-
-
-data_df = pd.read_pickle("saved_hs")
-
-clusters = range(0, 30)
-
-
-for _cluster in clusters:
-
-    cluster = [_cluster]
-
-    filtered_df = data_df[data_df['KMeans-clusters'].isin(cluster)]
-    filtered_df = filtered_df[filtered_df['scores'].notnull()]
-    filtered_df = filtered_df.drop(columns=['gensets', 'KMeans-clusters'])
-
-    _data = filtered_df.to_numpy()
-    X = _data[:, : -1]
-    y = _data[:, -1]
-
-    # # remove outliers
-    # X, y, tmp = rem_out(X, y)
-    # title = title + tmp
-
-    rs = ShuffleSplit(test_size=0.10)
-    train_index, test_index = list(rs.split(X))[0]
-
-    x_train = X[train_index]
-    y_train = y[train_index]
-
-    x_test = X[test_index]
-    y_test = y[test_index]
-
-    # create new model
-    model = linear_model.LinearRegression()
-    model.fit(x_train, y_train)
-
-    y_pred_test = model.predict(x_test)
-    print('Mean squared error linear reg: %.2f'% mean_squared_error(y_test, y_pred_test))
-    print('Coefficient of determination linear reg: %.2f'% r2_score(y_test, y_pred_test))
-
-    y_pred_all = model.predict(X)
-
-    linreg = stats.linregress(y, y_pred_all)
-
-    fig, ax = plt.subplots()
-    plt.scatter(y, y_pred_all, color='black')
-    # temp = [linreg.intercept + linreg.slope.item() * i for i in y]
-    # plt.plot(y, temp, 'r')
-
-    extra = Rectangle((0, 0), 1, 1, fc="w", fill=False, edgecolor='none', linewidth=0)
-    ax.legend([extra, extra], ('R2 = %0.2f' % linreg.rvalue, 'Slope = %0.2f' % linreg.slope))
-
-    # Just for graph title
-    title = 'MM-GO Cluster: ' + str(cluster) + ' : ' + " Outliers"
-    # tmp = ' -- All'
-
-    plt.xlabel('Actual')
-    plt.ylabel('Predicted')
-    plt.title(title)
-    plt.savefig("comb-plots/" + str(_cluster) + "a", dpi=100)
-    plt.show()
-    plt.clf()
-
-    node_count = len(y_pred_all)
-
-    for i in range(len(y_pred_all)):
-        if y_pred_all[i] < 0:
-            y_pred_all[i] = 0
-
-    y_res = y - y_pred_all
-    y_sse = (y - y_pred_all) ** 2
-    SD = math.sqrt(sum(y_sse)/(len(y_sse)-2))
-
-    _y = []
-    _x = []
-    for i in zip(X, y, y_res):
-        if abs(i[2]) < 2*SD:
-            _x.append(i[0])
-            _y.append(i[1])
-
-    X = np.array(_x)
-    y = np.array(_y)
-
-    model.fit(X, y)
-    y_pred_all = model.predict(X)
-
-    drop_count = len(y_pred_all)
-
-    # scatter plot section
-    linreg = stats.linregress(y, y_pred_all)
-
-    fig, ax = plt.subplots()
-    plt.scatter(y, y_pred_all,  color='black')
-    # temp = [linreg.intercept + linreg.slope.item()*i for i in y]
-    # plt.plot(y, temp, 'r')
-
-    extra = Rectangle((0, 0), 1, 1, fc="w", fill=False, edgecolor='none', linewidth=0)
-    ax.legend([extra, extra, extra, extra], ('R2 = %0.2f' % linreg.rvalue,
-                                             'Slope = %0.2f' % linreg.slope,
-              'Nodes = %d' % node_count, 'Ret = %d' % drop_count))
-
-    # Just for graph title
-    title = 'MM-GO Cluster: ' + str(cluster) + ' : ' + " No Outliers"
-    # tmp = ' -- All'
-
-    plt.xlabel('Actual')
-    plt.ylabel('Predicted')
-    plt.title(title)
-    plt.savefig("comb-plots/" + str(_cluster) + "b", dpi=100)
-    plt.show()
-    plt.clf()
-
-    title = "Normal Quantile plot -- MM-GO" + str(cluster)
-    c = stats.probplot(y_res, dist='norm', plot=pylab)
-    plt.title(title)
-    plt.savefig("comb-plots/" + str(_cluster) + "c", dpi=100)
-    pylab.show()
-    plt.clf()
