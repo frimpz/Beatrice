@@ -36,11 +36,10 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     return torch.sparse.FloatTensor(indices, values, shape)
 
 
-def load_data(file_name, features=True):
+def load_data(adj, features=True):
     # adjacency matrix
-    adj = read_file(file_name)
-    G = nx.Graph()
-    G.add_edges_from(adj)
+    # adj = read_file(file_name)
+    G = nx.from_numpy_matrix(adj)
 
     nodes = G.nodes()
     label = [i for i in range(len(nodes))]
@@ -51,7 +50,7 @@ def load_data(file_name, features=True):
     # output = sorted(degrees, key=lambda x: x[-1], reverse=True)
     # print(output)
     write_file("rel/relabel-hs.csv", dictionary)
-    adj = nx.to_numpy_array(G)
+    # adj = nx.to_numpy_array(G)
 
     if features:
         pass
@@ -163,8 +162,8 @@ def mask_test_edges(adj):
     edges = adj_tuple[0]
 
     edges_all = sparse_to_tuple(adj)[0]
-    num_test = 200# int(np.floor(edges.shape[0] / 1.0))
-    num_val = 200# int(np.floor(edges.shape[0] / 0.10))
+    num_test = int(np.floor(edges.shape[0] / 30.0))
+    num_val = int(np.floor(edges.shape[0] / 10.0))
 
 
     all_edge_idx = list(range(edges.shape[0]))

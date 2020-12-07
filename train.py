@@ -1,6 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 
+import pickle
 import time
 import argparse
 import numpy as np
@@ -21,9 +22,9 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
 parser.add_argument('--fastmode', action='store_true', default=False,
                     help='Validate during training pass.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=50,
+parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
-parser.add_argument('--lr', type=float, default=0.06,
+parser.add_argument('--lr', type=float, default=0.01,
                     help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=0.01, #default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
@@ -44,8 +45,10 @@ if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
 
-adj, features = load_data('graphs/MM-HS-Combined-20201130.tsv', False)
-
+with open('test1.pkl', 'rb') as f:
+    x = pickle.load(f)
+    print(x.shape)
+adj, features = load_data(x, False)
 
 
 # Store original adjacency matrix (without diagonal entries) for later
@@ -54,8 +57,8 @@ adj_orig = adj_orig - sp.dia_matrix((adj_orig.diagonal()[np.newaxis, :], [0]), s
 adj_orig.eliminate_zeros()
 
 
-adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges2(adj, adj.shape[0])
-# adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges(adj)
+# adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges2(adj, adj.shape[0])
+adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges(adj)
 
 adj = adj_train
 
@@ -75,7 +78,7 @@ model = GCNModelAE(nfeat=features.shape[1],
             dropout=args.dropout)
 
 optimizer = optim.Adam(model.parameters(),
-                       lr=args.lr)#, weight_decay=args.weight_decay)
+                       lr=args.lr,)# weight_decay=args.weight_decay)
 
 
 indices = []
