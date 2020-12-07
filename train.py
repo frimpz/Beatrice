@@ -26,7 +26,7 @@ parser.add_argument('--epochs', type=int, default=200,
                     help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.01,
                     help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=0.01, #default=5e-4,
+parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay (L2 loss on parameters).')
 parser.add_argument('--hidden', type=int, default=32,
                     help='Number of hidden units.')
@@ -78,7 +78,7 @@ model = GCNModelAE(nfeat=features.shape[1],
             dropout=args.dropout)
 
 optimizer = optim.Adam(model.parameters(),
-                       lr=args.lr,)# weight_decay=args.weight_decay)
+                       lr=args.lr, weight_decay=args.weight_decay)
 
 
 indices = []
@@ -123,6 +123,6 @@ print('Test AP score: ' + str(ap_score))
 auc_roc(hidden_emb, adj_orig, test_edges, test_edges_false, roc_score)
 
 
-torch.save(model.state_dict(), "tr/HS-com-0.06")
+torch.save(model.state_dict(), "tr/trained")
 
 # plot_loss(indices, losses, "Epooch", "Loss", "Epooch vs loss")
