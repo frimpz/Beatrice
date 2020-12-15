@@ -60,8 +60,8 @@ def tsne_plot(x, y, clusters, title=""):
 
 def k_meansElbow(data, type):
     Sum_of_squared_distances = []
-    _min = 5
-    _max = 60
+    _min = 10
+    _max = 40
     stp = 5
     K = range(_min, _max, stp)
     for k in K:

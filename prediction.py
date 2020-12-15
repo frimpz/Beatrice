@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
-from cluster_utils import plot_optimal_clusters, k_means, try_data
+from cluster_utils import plot_optimal_clusters, k_means, try_data, plot_tsne, plot_heat_map
 from loss import loss_function_ae
 from model import GCNModelAE
 from plots import plot_loss, auc_roc
@@ -79,9 +79,9 @@ for i in range(args.ndim):
     _vars.append(str(i))
 data_df = pd.DataFrame(meta_df)
 
-
-plot_optimal_clusters(data, "K-means " + args.title, 'kmeans')
-kmeans_labels = k_means(data, 9, model_name="models/kmeans_gcn_model.pkl")
+print(data_df)
+# plot_optimal_clusters(data, "K-means " + args.title, 'kmeans')
+kmeans_labels = k_means(data, 20, model_name="models/kmeans_gcn_model.pkl")
 
 # Add labels
 data_df['KMeans-clusters'] = kmeans_labels
@@ -116,7 +116,7 @@ kmeans_unique_clusters = set(kmeans_labels)
 # # # Plots here
 # # plots_pairwise(data_df, 'KMeans-clusters', _vars, kmeans_unique_clusters,
 # #                 "Pairwise Scatter Plot for KMeans Clustering" + args.title)
-# # plot_heat_map(data_df.iloc[:, 0:16], "Correlation matrix for Node Embeddings " + args.title)
+plot_heat_map(data_df.iloc[:, 0:16], "Correlation matrix for Node Embeddings " + args.title)
 # #
 # plot_tsne(data_df.iloc[:, 0:16], data_df['KMeans-clusters'],
 #           "Clustering node embeddings with KMeans Perplexity: {} -- "
