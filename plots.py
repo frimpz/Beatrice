@@ -6,18 +6,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 from kneed import KneeLocator
-# Pairwise Scatter plot for features
 from sklearn.cluster import KMeans
-from sklearn.manifold import TSNE
-from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import roc_curve
 
-
-
-def pairwise_scatter(data, hue, x_vars, y_vars, title="", marker=None):
-    g = sns.pairplot(data, markers=marker, hue=hue, height=3, x_vars=x_vars, y_vars=y_vars)
-    g.fig.suptitle(title)
-    plt.show()
 
 
 # Pairwise Scatter plot for features
@@ -75,17 +66,6 @@ def k_meansElbow(data, type):
     plt.ylabel('Sum_of_squared_distances')
     plt.title('Elbow Method For Optimal k --- '+ type)
     plt.text(_max - 2*stp, max(Sum_of_squared_distances), 'k = %d' % kn.knee)
-    plt.show()
-
-
-def opt_dbScan(data, type):
-    neighbour = NearestNeighbors(n_neighbors=2)
-    nbrs = neighbour.fit(data)
-    dist, indicies = nbrs.kneighbors(data, return_distance=True)
-    dist = np.sort(dist, axis=0)
-    dist = dist[:, 1]
-    plt.plot(dist)
-    plt.title('Optimal DBScan Plot --- '+ type)
     plt.show()
 
 

@@ -6,7 +6,7 @@ import torch
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.manifold import TSNE
 
-from plots import opt_dbScan, k_meansElbow, pairwise_scatter, heat_map, tsne_plot
+from plots import  k_meansElbow, heat_map, tsne_plot
 
 
 def try_data(_prediction):
@@ -14,25 +14,13 @@ def try_data(_prediction):
     return final
 
 
-def plot_optimal_clusters(data, type, cluster):
-    if cluster == 'dbscan':
-        # Cluster with DB-Scan
-        opt_dbScan(data, type)
-    elif cluster == 'kmeans':
-        # Optimal Clusters K-Means
-        k_meansElbow(data, type)
+def plot_optimal_clusters(data, type):
+    # Optimal Clusters K-Means
+    k_meansElbow(data, type)
     sys.exit()
 
 
-# Cluster with DB-Scan
-# DB-Scan
-# model_name -> "dbs_model.pkl"
-def db_scan(data, eps, min_samples, model_name):
-    dbsc = DBSCAN(eps=eps, min_samples=min_samples)
-    dbs_model = dbsc.fit(data)
-    pickle.dump(dbs_model, open(model_name, 'wb'))
-    dbs_labels = dbsc.labels_
-    return dbs_labels
+
 
 
 # Cluster with K-means

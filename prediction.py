@@ -80,49 +80,16 @@ for i in range(args.ndim):
 data_df = pd.DataFrame(meta_df)
 
 print(data_df)
-# plot_optimal_clusters(data, "K-means " + args.title, 'kmeans')
+plot_optimal_clusters(data, "K-means " + args.title)
 kmeans_labels = k_means(data, 20, model_name="models/kmeans_gcn_model.pkl")
 
 # Add labels
 data_df['KMeans-clusters'] = kmeans_labels
 kmeans_unique_clusters = set(kmeans_labels)
 
-# # compute davies and silhoutte scores
-# scores = {}
-# scores['dav_score'] = davies_bouldin_score(data, kmeans_labels)
-# scores['sil_score'] = silhouette_score(data, kmeans_labels)
-# write_file('results/cluster_scores_gcn.csv', scores)
-
-
-# res = read_file("data/ms-project/geneset_pairing.csv")
-# dict = dict((v, k) for k, v in res.items())
-# data_df['gensets'] = data_df.index.map(dict)
-# # data_df.set_index('gensets', inplace=True)
-#
-# sim = data_df[['gensets', 'KMeans-clusters']]
-# grp = data_df[['gensets', 'KMeans-clusters']]\
-#     .sort_values('KMeans-clusters')\
-#     .set_index(['KMeans-clusters', 'gensets'], inplace=False)
-# agg = data_df.groupby('KMeans-clusters').agg({'gensets': 'count'})
-#
-#
-# writer = pd.ExcelWriter('results/kmeans_gcn_hom_onto.xlsx')
-# sim.to_excel(writer, sheet_name='simple')
-# grp.to_excel(writer, sheet_name='grouped')
-# agg.to_excel(writer, sheet_name='agg')
-# writer.save()
-# #
-# #
-# # # Plots here
-# # plots_pairwise(data_df, 'KMeans-clusters', _vars, kmeans_unique_clusters,
-# #                 "Pairwise Scatter Plot for KMeans Clustering" + args.title)
+# Plots here
 plot_heat_map(data_df.iloc[:, 0:16], "Correlation matrix for Node Embeddings " + args.title)
-# #
-# plot_tsne(data_df.iloc[:, 0:16], data_df['KMeans-clusters'],
-#           "Clustering node embeddings with KMeans Perplexity: {} -- "
-#           "Number of Iterations: {}" + args.title, perplexity=50, n_iter=1000)
 
-# # write to tsv for visualisation
-# tsv_df = data_df.iloc[:, 0:17]
-# tsv_df.to_csv("tsv/kmeans_gcn", sep="\t", index=False)
+plot_tsne(data_df.iloc[:, 0:16], data_df['KMeans-clusters'],
+          "Clustering node embeddings with KMeans Perplexity: {} -- ")
 
